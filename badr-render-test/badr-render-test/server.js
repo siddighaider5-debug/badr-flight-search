@@ -103,6 +103,8 @@ app.get("/api/search-badr", async (req, res) => {
 
     const body = await page.$eval("body", (element) => element.innerText);
 
+    console.log("BADR PAGE TEXT:", body);
+
     if (/enable JS|ad blocker/i.test(body)) {
       throw new Error("تم رفض طلب البحث من موقع بدر.");
     }
