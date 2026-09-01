@@ -4,6 +4,7 @@ const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 10000;
+
 const BASE_URL =
   "https://fo-emea.ttinteractive.com/zenith/frontoffice/badrairlines/en-GB/BookingEngine";
 
@@ -11,29 +12,21 @@ function validCode(value) {
   return /^[A-Z]{3}$/.test(value || "");
 }
 
-function extractCards() {
-  return Array.from(
-    document.querySelectorAll(
-      '[class*="flight" i], [class*="journey" i], [class*="availability" i], [data-flight]'
-    )
-  )
-    .map((element) => {
-      const text = (element.innerText || "").replace(/\s{2,}/g, " ").trim();
-      const price = text.match(
-        /(?:USD|SDG|SAR)\s?[\d,.]+|[\d,.]+\s?(?:USD|SDG|SAR)/i
-      );
-      const times = text.match(/\b\d{1,2}:\d{2}\b/g) || [];
+function extractFlightsFromText(text, origin, destination) {
+  const times = text.match(/\b(?:[01]\d|2[0-3]):[0-5]\d\b/g) || [];
+  const prices = text.match(/\$\s?[\d,.]+/g) || [];
 
-      return {
-        title:
-          times.length >= 2
-            ? `بدر للطيران — ${times[0]} إلى ${times[1]}`
-            : "رحلة بدر للطيران",
-        details: text.slice(0, 450),
-        price: price ? price[0] : "",
-      };
-    })
-    .filter((item) => item.details.length > 10);
+  if (times.length < 2 || prices.length < 1) {
+    return [];
+  }
+
+  return [
+    {
+      title: `بدر للطيران — ${origin} إلى ${destination}`,
+      details: `الإقلاع: ${times[0]} — الوصول: ${times[1]}`,
+      price: prices[prices.length - 1],
+    },
+  ];
 }
 
 app.use(express.static(path.join(__dirname, "public")));
@@ -114,9 +107,9 @@ app.get("/api/search-badr", async (req, res) => {
       throw new Error("تم رفض طلب البحث من موقع بدر.");
     }
 
-    res.json({
-      flights: await page.evaluate(extractCards),
-    });
+    const flights = extractFlightsFromText(body, origin, destination);
+
+    res.json({ flights });
   } catch (error) {
     console.error("Badr search failed:", error.message);
 
